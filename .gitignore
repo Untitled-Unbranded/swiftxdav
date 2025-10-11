@@ -1,0 +1,37 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+xcuserdata/
+*.xcworkspace
+!default.xcworkspace
+*.xcodeproj
+!Package.swift
+
+# macOS
+.DS_Store
+
+# Swift
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+
+# Build artifacts
+DerivedData/
+.derivedData
+
+# IDEs
+.vscode/
+.idea/
+
+# Testing
+.test/
+
+# Documentation build
+.docc-build/
+
+# Temporary files
+*.tmp
+*~
