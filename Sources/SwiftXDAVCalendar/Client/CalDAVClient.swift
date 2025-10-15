@@ -57,8 +57,8 @@ import SwiftXDAVNetwork
 /// - ``updateEvent(_:in:etag:)``
 /// - ``deleteEvent(uid:from:)``
 public actor CalDAVClient {
-    private let httpClient: HTTPClient
-    private let baseURL: URL
+    internal let httpClient: HTTPClient
+    internal let baseURL: URL
 
     // Cached discovery results
     private var cachedPrincipalURL: URL?

@@ -53,8 +53,8 @@ import SwiftXDAVNetwork
 /// - ``updateContact(_:in:etag:)``
 /// - ``deleteContact(uid:from:)``
 public actor CardDAVClient {
-    private let httpClient: HTTPClient
-    private let baseURL: URL
+    internal let httpClient: HTTPClient
+    internal let baseURL: URL
 
     // Cached discovery results
     private var cachedPrincipalURL: URL?
