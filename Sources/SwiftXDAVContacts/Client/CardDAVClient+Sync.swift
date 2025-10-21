@@ -177,7 +177,7 @@ extension CardDAVClient {
                 // Create a minimal vCard with just the UID for deletion
                 // Extract UID from URL (typically /path/to/UUID.vcf)
                 let uid = change.url.deletingPathExtension().lastPathComponent
-                let deletedContact = VCard(uid: uid)
+                let deletedContact = VCard(uid: uid, formattedName: "")
                 contactChanges.append((.deleted, deletedContact))
             }
         }

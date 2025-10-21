@@ -78,11 +78,11 @@ public struct SyncCollectionRequest {
         xml.startElement("d:sync-collection", attributes: ["xmlns:d": "DAV:"])
 
         // Sync token element
-        xml.startElement("d:sync-token")
         if let token = syncToken {
-            xml.elements.append(token.value.xmlEscaped)
+            xml.element("d:sync-token", value: token.value)
+        } else {
+            xml.element("d:sync-token")
         }
-        xml.endElement("d:sync-token")
 
         // Sync level (1 = immediate children only)
         xml.element("d:sync-level", value: "1")
@@ -137,7 +137,7 @@ public struct SyncCollectionRequest {
 
         // Parse the multi-status response
         let parser = SyncCollectionParser()
-        return try parser.parse(response.data)
+        return try await parser.parse(response.data)
     }
 }
 

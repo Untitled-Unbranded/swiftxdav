@@ -89,7 +89,7 @@ public enum ConflictResolutionStrategy: Sendable, Equatable {
     ///
     /// A custom merge function is called to combine the two versions.
     /// This is useful for application-specific merge logic.
-    case merge((SyncConflict) async throws -> Data)
+    case merge(@Sendable (SyncConflict) async throws -> Data)
 
     /// Fail the sync operation
     ///

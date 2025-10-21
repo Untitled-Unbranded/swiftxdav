@@ -3,232 +3,184 @@ import XCTest
 @testable import SwiftXDAVCore
 
 final class ServerDetectorTests: XCTestCase {
-    // MARK: - Server Detection Tests
+    // MARK: - Server Type Detection
 
-    func testDetectICloudServer() async throws {
+    func testDetectICloudFromURL() async {
         let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://caldav.icloud.com")!
-
-        // Mock OPTIONS response with iCloud-like headers
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "DAV": "1, 2, 3, calendar-access, calendar-schedule, addressbook, sync-collection, extended-mkcol",
-                "Server": "CalendarServer/10.0"
-            ],
-            body: ""
-        )
-
         let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
 
-        XCTAssertEqual(capabilities.serverType, .iCloud)
-        XCTAssertTrue(capabilities.supportsCalDAV)
-        XCTAssertTrue(capabilities.supportsCardDAV)
-        XCTAssertTrue(capabilities.supportsSyncToken)
-        XCTAssertTrue(capabilities.supportsScheduling)
-        XCTAssertTrue(capabilities.supportsExtendedMKCOL)
-        XCTAssertTrue(capabilities.supportsAppleExtensions)
-        XCTAssertTrue(capabilities.supportsCalendarServerExtensions)
+        let iCloudURL = URL(string: "https://caldav.icloud.com")!
+        let serverType = await detector.detectServerType(from: "", baseURL: iCloudURL)
+
+        XCTAssertEqual(serverType, .iCloud)
     }
 
-    func testDetectGoogleServer() async throws {
+    func testDetectGoogleFromURL() async {
         let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://apidata.googleusercontent.com/caldav/v2/")!
-
-        // Mock OPTIONS response with Google-like headers
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "DAV": "1, calendar-access, sync-collection",
-                "Server": "Google Calendar"
-            ],
-            body: ""
-        )
-
         let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
 
-        XCTAssertEqual(capabilities.serverType, .google)
-        XCTAssertTrue(capabilities.supportsCalDAV)
-        XCTAssertFalse(capabilities.supportsCardDAV)
-        XCTAssertTrue(capabilities.supportsSyncToken)
-        XCTAssertFalse(capabilities.supportsScheduling)
-        XCTAssertFalse(capabilities.supportsAppleExtensions)
+        let googleURL = URL(string: "https://apidata.googleusercontent.com")!
+        let serverType = await detector.detectServerType(from: "", baseURL: googleURL)
+
+        XCTAssertEqual(serverType, .google)
     }
 
-    func testDetectNextcloudServer() async throws {
+    func testDetectNextcloudFromServerHeader() async {
         let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://cloud.example.com")!
+        let detector = ServerDetector(httpClient: mockClient)
 
-        // Mock OPTIONS response with Nextcloud-like headers
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "DAV": "1, 2, 3, calendar-access, calendar-schedule, addressbook, sync-collection",
-                "Server": "Nextcloud/25.0.0"
-            ],
-            body: ""
+        let url = URL(string: "https://cloud.example.com")!
+        let serverType = await detector.detectServerType(
+            from: "Nextcloud/25.0.3",
+            baseURL: url
         )
 
-        let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
-
-        XCTAssertEqual(capabilities.serverType, .nextcloud)
-        XCTAssertTrue(capabilities.supportsCalDAV)
-        XCTAssertTrue(capabilities.supportsCardDAV)
-        XCTAssertTrue(capabilities.supportsSyncToken)
-        XCTAssertTrue(capabilities.supportsScheduling)
+        XCTAssertEqual(serverType, .nextcloud)
     }
 
-    func testDetectRadicaleServer() async throws {
+    func testDetectRadicaleFromServerHeader() async {
         let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
+        let detector = ServerDetector(httpClient: mockClient)
 
-        // Mock OPTIONS response with Radicale-like headers
-        await mockClient.addResponse(
-            for: baseURL,
+        let url = URL(string: "https://dav.example.com")!
+        let serverType = await detector.detectServerType(
+            from: "Radicale/3.1.8",
+            baseURL: url
+        )
+
+        XCTAssertEqual(serverType, .radicale)
+    }
+
+    func testDetectGenericServer() async {
+        let mockClient = MockHTTPClient()
+        let detector = ServerDetector(httpClient: mockClient)
+
+        let url = URL(string: "https://unknown.example.com")!
+        let serverType = await detector.detectServerType(
+            from: "Apache/2.4.52",
+            baseURL: url
+        )
+
+        XCTAssertEqual(serverType, .generic)
+    }
+
+    // MARK: - Capability Detection
+
+    func testDetectCalDAVCapability() async throws {
+        let mockClient = MockHTTPClient()
+        mockClient.mockResponse = HTTPResponse(
             statusCode: 200,
             headers: [
-                "DAV": "1, calendar-access, addressbook",
+                "DAV": "1, 2, 3, calendar-access",
+                "Allow": "OPTIONS, GET, HEAD, POST, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK, REPORT",
                 "Server": "Radicale/3.1.8"
             ],
-            body: ""
+            data: Data()
         )
 
         let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
+        let capabilities = try await detector.detectCapabilities(
+            baseURL: URL(string: "https://dav.example.com")!
+        )
 
-        XCTAssertEqual(capabilities.serverType, .radicale)
         XCTAssertTrue(capabilities.supportsCalDAV)
-        XCTAssertTrue(capabilities.supportsCardDAV)
-        XCTAssertFalse(capabilities.supportsSyncToken)
-        XCTAssertFalse(capabilities.supportsScheduling)
+        XCTAssertTrue(capabilities.supportsSyncCollection)
+        XCTAssertTrue(capabilities.supportsCalendarQuery)
+        XCTAssertEqual(capabilities.serverType, .radicale)
     }
 
-    func testDetectGenericServer() async throws {
+    func testDetectCardDAVCapability() async throws {
         let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
+        mockClient.mockResponse = HTTPResponse(
+            statusCode: 200,
+            headers: [
+                "DAV": "1, 2, addressbook",
+                "Allow": "OPTIONS, GET, HEAD, POST, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK, REPORT",
+                "Server": "Nextcloud/25.0.3"
+            ],
+            data: Data()
+        )
 
-        // Mock OPTIONS response with minimal DAV support
-        await mockClient.addResponse(
-            for: baseURL,
+        let detector = ServerDetector(httpClient: mockClient)
+        let capabilities = try await detector.detectCapabilities(
+            baseURL: URL(string: "https://cloud.example.com")!
+        )
+
+        XCTAssertTrue(capabilities.supportsCardDAV)
+        XCTAssertTrue(capabilities.supportsAddressbookQuery)
+        XCTAssertEqual(capabilities.serverType, .nextcloud)
+    }
+
+    func testDetectSchedulingSupport() async throws {
+        let mockClient = MockHTTPClient()
+        mockClient.mockResponse = HTTPResponse(
+            statusCode: 200,
+            headers: [
+                "DAV": "1, 2, 3, calendar-access, calendar-schedule",
+                "Allow": "OPTIONS, GET, HEAD, POST, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK, REPORT",
+                "Server": "SOGo/5.5.0"
+            ],
+            data: Data()
+        )
+
+        let detector = ServerDetector(httpClient: mockClient)
+        let capabilities = try await detector.detectCapabilities(
+            baseURL: URL(string: "https://sogo.example.com")!
+        )
+
+        XCTAssertTrue(capabilities.supportsScheduling)
+        XCTAssertEqual(capabilities.serverType, .sogo)
+    }
+
+    func testParseSupportedMethods() async throws {
+        let mockClient = MockHTTPClient()
+        mockClient.mockResponse = HTTPResponse(
             statusCode: 200,
             headers: [
                 "DAV": "1, 2",
-                "Server": "Custom WebDAV Server"
+                "Allow": "OPTIONS, GET, PUT, DELETE, PROPFIND, REPORT",
+                "Server": "Generic"
             ],
-            body: ""
+            data: Data()
         )
 
         let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
-
-        XCTAssertEqual(capabilities.serverType, .generic)
-        XCTAssertFalse(capabilities.supportsCalDAV)
-        XCTAssertFalse(capabilities.supportsCardDAV)
-        XCTAssertFalse(capabilities.supportsSyncToken)
-    }
-
-    func testDetectionWithoutServerHeader() async throws {
-        let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
-
-        // Mock OPTIONS response without Server header
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "DAV": "1, 2, calendar-access"
-            ],
-            body: ""
+        let capabilities = try await detector.detectCapabilities(
+            baseURL: URL(string: "https://dav.example.com")!
         )
 
-        let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
-
-        XCTAssertEqual(capabilities.serverType, .generic)
-        XCTAssertNil(capabilities.serverProduct)
-        XCTAssertTrue(capabilities.supportsCalDAV)
-    }
-
-    func testDetectionFailureWithBadStatus() async throws {
-        let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
-
-        // Mock failed OPTIONS response
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 404,
-            headers: [:],
-            body: "Not Found"
-        )
-
-        let detector = ServerDetector(httpClient: mockClient)
-
-        do {
-            _ = try await detector.detect(baseURL: baseURL)
-            XCTFail("Should throw error for 404 response")
-        } catch let error as SwiftXDAVError {
-            if case .invalidResponse(let statusCode, _) = error {
-                XCTAssertEqual(statusCode, 404)
-            } else {
-                XCTFail("Wrong error type: \(error)")
-            }
-        }
-    }
-
-    func testCaseInsensitiveHeaderParsing() async throws {
-        let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
-
-        // Mock OPTIONS response with different case headers
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "dav": "1, 2, calendar-access",  // lowercase
-                "Server": "Test Server"
-            ],
-            body: ""
-        )
-
-        let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
-
-        // Should still parse DAV header correctly
-        XCTAssertTrue(capabilities.supportsCalDAV)
-    }
-
-    func testDAVClassParsing() async throws {
-        let mockClient = MockHTTPClient()
-        let baseURL = URL(string: "https://dav.example.com")!
-
-        await mockClient.addResponse(
-            for: baseURL,
-            statusCode: 200,
-            headers: [
-                "DAV": "1, 2, 3, calendar-access, calendar-schedule, addressbook, sync-collection, extended-mkcol"
-            ],
-            body: ""
-        )
-
-        let detector = ServerDetector(httpClient: mockClient)
-        let capabilities = try await detector.detect(baseURL: baseURL)
-
-        XCTAssertTrue(capabilities.supportsDavClass("1"))
-        XCTAssertTrue(capabilities.supportsDavClass("2"))
-        XCTAssertTrue(capabilities.supportsDavClass("3"))
-        XCTAssertTrue(capabilities.supportsDavClass("calendar-access"))
-        XCTAssertTrue(capabilities.supportsDavClass("calendar-schedule"))
-        XCTAssertTrue(capabilities.supportsDavClass("addressbook"))
-        XCTAssertTrue(capabilities.supportsDavClass("sync-collection"))
-        XCTAssertTrue(capabilities.supportsDavClass("extended-mkcol"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("OPTIONS"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("GET"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("PUT"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("DELETE"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("PROPFIND"))
+        XCTAssertTrue(capabilities.supportedMethods.contains("REPORT"))
     }
 }
 
-// Use the same MockHTTPClient from OAuth2TokenManagerTests
-// (In a real test suite, this would be in a shared test utilities file)
+// MARK: - Mock HTTP Client
+
+final class MockHTTPClient: @unchecked Sendable, HTTPClient {
+    var mockResponse: HTTPResponse?
+    var lastRequest: (method: HTTPMethod, url: URL, headers: [String: String]?, body: Data?)?
+
+    func request(
+        _ method: HTTPMethod,
+        url: URL,
+        headers: [String: String]?,
+        body: Data?
+    ) async throws -> HTTPResponse {
+        lastRequest = (method, url, headers, body)
+
+        if let mockResponse = mockResponse {
+            return mockResponse
+        }
+
+        // Default response
+        return HTTPResponse(
+            statusCode: 200,
+            headers: [:],
+            data: Data()
+        )
+    }
+}

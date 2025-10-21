@@ -464,7 +464,7 @@ extension CardDAVClient {
         clientID: String,
         clientSecret: String,
         expiresAt: Date? = nil,
-        onTokenRefresh: ((String, Date?) -> Void)? = nil
+        onTokenRefresh: (@Sendable (String, Date?) -> Void)? = nil
     ) -> CardDAVClient {
         let oauth2Client = OAuth2HTTPClient.google(
             accessToken: accessToken,

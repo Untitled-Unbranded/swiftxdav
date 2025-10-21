@@ -1,125 +1,159 @@
 import Foundation
 import SwiftXDAVCore
 
-/// Manages OAuth 2.0 access and refresh tokens with automatic refresh
+/// OAuth 2.0 token manager with automatic refresh capabilities
 ///
-/// This actor handles OAuth 2.0 token lifecycle, automatically refreshing
-/// expired access tokens using refresh tokens.
+/// This actor manages OAuth 2.0 tokens and handles automatic refresh when tokens expire.
+/// It's thread-safe and can be shared across multiple HTTP clients.
 ///
 /// ## Usage
 ///
+/// ### Create with initial tokens
+///
 /// ```swift
 /// let tokenManager = OAuth2TokenManager(
-///     accessToken: "current-access-token",
-///     refreshToken: "refresh-token",
+///     accessToken: "ya29.a0...",
+///     refreshToken: "1//0g...",
 ///     tokenURL: URL(string: "https://oauth2.googleapis.com/token")!,
 ///     clientID: "your-client-id",
 ///     clientSecret: "your-client-secret"
 /// )
-///
-/// // Get current valid token (automatically refreshes if expired)
-/// let token = try await tokenManager.getValidAccessToken()
 /// ```
+///
+/// ### Get current access token (auto-refreshes if needed)
+///
+/// ```swift
+/// let token = try await tokenManager.getAccessToken()
+/// ```
+///
+/// ## Topics
+///
+/// ### Initialization
+/// - ``init(accessToken:refreshToken:tokenURL:clientID:clientSecret:expiresAt:)``
+///
+/// ### Token Management
+/// - ``getAccessToken()``
+/// - ``refreshTokenIfNeeded()``
+/// - ``forceRefresh()``
+///
+/// ### Token Information
+/// - ``isExpired``
+/// - ``expiresAt``
 public actor OAuth2TokenManager {
-    /// OAuth 2.0 token response
-    public struct TokenResponse: Sendable, Codable {
-        public let accessToken: String
-        public let refreshToken: String?
-        public let expiresIn: Int?
-        public let tokenType: String?
+    // MARK: - Properties
 
-        enum CodingKeys: String, CodingKey {
-            case accessToken = "access_token"
-            case refreshToken = "refresh_token"
-            case expiresIn = "expires_in"
-            case tokenType = "token_type"
-        }
-
-        public init(accessToken: String, refreshToken: String? = nil, expiresIn: Int? = nil, tokenType: String? = nil) {
-            self.accessToken = accessToken
-            self.refreshToken = refreshToken
-            self.expiresIn = expiresIn
-            self.tokenType = tokenType
-        }
-    }
-
+    /// The current access token
     private var accessToken: String
-    private var refreshToken: String?
-    private var expiresAt: Date?
 
+    /// The refresh token used to obtain new access tokens
+    private let refreshToken: String
+
+    /// The URL for the token refresh endpoint
     private let tokenURL: URL
+
+    /// OAuth 2.0 client ID
     private let clientID: String
+
+    /// OAuth 2.0 client secret
     private let clientSecret: String?
 
-    /// Initialize OAuth 2.0 token manager
+    /// When the current access token expires
+    private var expiresAt: Date?
+
+    /// Buffer time before expiration to trigger refresh (default: 5 minutes)
+    private let expirationBuffer: TimeInterval = 300
+
+    /// Callback for when tokens are refreshed (useful for persistence)
+    private var onTokenRefresh: (@Sendable (String, Date?) -> Void)?
+
+    // MARK: - Initialization
+
+    /// Create an OAuth 2.0 token manager
     ///
     /// - Parameters:
-    ///   - accessToken: Current access token
-    ///   - refreshToken: Refresh token for obtaining new access tokens
-    ///   - expiresIn: Number of seconds until access token expires
-    ///   - tokenURL: URL for token refresh requests
+    ///   - accessToken: The initial access token
+    ///   - refreshToken: The refresh token for obtaining new access tokens
+    ///   - tokenURL: The token refresh endpoint URL
     ///   - clientID: OAuth 2.0 client ID
     ///   - clientSecret: OAuth 2.0 client secret (optional for some flows)
+    ///   - expiresAt: When the access token expires (optional)
+    ///   - onTokenRefresh: Callback when tokens are refreshed (optional)
     public init(
         accessToken: String,
-        refreshToken: String? = nil,
-        expiresIn: Int? = nil,
+        refreshToken: String,
         tokenURL: URL,
         clientID: String,
-        clientSecret: String? = nil
+        clientSecret: String? = nil,
+        expiresAt: Date? = nil,
+        onTokenRefresh: (@Sendable (String, Date?) -> Void)? = nil
     ) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.tokenURL = tokenURL
         self.clientID = clientID
         self.clientSecret = clientSecret
-
-        if let expiresIn = expiresIn {
-            // Set expiry with 5 minute buffer to avoid edge cases
-            self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresIn - 300))
-        }
+        self.expiresAt = expiresAt
+        self.onTokenRefresh = onTokenRefresh
     }
 
-    /// Get a valid access token, refreshing if necessary
+    // MARK: - Public Methods
+
+    /// Get the current access token, refreshing if necessary
+    ///
+    /// This method automatically refreshes the token if it's expired or about to expire.
     ///
     /// - Returns: A valid access token
-    /// - Throws: `SwiftXDAVError` if token refresh fails
-    public func getValidAccessToken() async throws -> String {
-        // Check if current token is still valid
-        if let expiresAt = expiresAt, Date() < expiresAt {
-            return accessToken
-        }
-
-        // Token expired or no expiry info, try to refresh
-        guard let refreshToken = refreshToken else {
-            throw SwiftXDAVError.authenticationRequired
-        }
-
-        try await refreshAccessToken(refreshToken: refreshToken)
+    /// - Throws: ``SwiftXDAVError`` if token refresh fails
+    public func getAccessToken() async throws -> String {
+        try await refreshTokenIfNeeded()
         return accessToken
     }
 
-    /// Refresh the access token using the refresh token
+    /// Check if the current token is expired or about to expire
+    public var isExpired: Bool {
+        guard let expiresAt = expiresAt else {
+            // If we don't know when it expires, assume it might be expired
+            return true
+        }
+
+        // Consider expired if within buffer time of actual expiration
+        return Date().addingTimeInterval(expirationBuffer) >= expiresAt
+    }
+
+    /// Refresh the token if it's expired or about to expire
     ///
-    /// - Parameter refreshToken: The refresh token to use
-    /// - Throws: `SwiftXDAVError` if refresh fails
-    private func refreshAccessToken(refreshToken: String) async throws {
-        var urlComponents = URLComponents(url: tokenURL, resolvingAgainstBaseURL: false)!
-        urlComponents.queryItems = [
+    /// - Throws: ``SwiftXDAVError`` if refresh fails
+    public func refreshTokenIfNeeded() async throws {
+        guard isExpired else {
+            return
+        }
+
+        try await forceRefresh()
+    }
+
+    /// Force a token refresh regardless of expiration status
+    ///
+    /// - Throws: ``SwiftXDAVError`` if refresh fails
+    public func forceRefresh() async throws {
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        // Build request body
+        var bodyComponents = URLComponents()
+        bodyComponents.queryItems = [
             URLQueryItem(name: "grant_type", value: "refresh_token"),
             URLQueryItem(name: "refresh_token", value: refreshToken),
             URLQueryItem(name: "client_id", value: clientID)
         ]
 
         if let clientSecret = clientSecret {
-            urlComponents.queryItems?.append(URLQueryItem(name: "client_secret", value: clientSecret))
+            bodyComponents.queryItems?.append(URLQueryItem(name: "client_secret", value: clientSecret))
         }
 
-        var request = URLRequest(url: tokenURL)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = urlComponents.query?.data(using: .utf8)
+        request.httpBody = bodyComponents.query?.data(using: .utf8)
 
+        // Execute request
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -127,76 +161,68 @@ public actor OAuth2TokenManager {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let body = String(data: data, encoding: .utf8)
-            throw SwiftXDAVError.invalidResponse(statusCode: httpResponse.statusCode, body: body)
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw SwiftXDAVError.invalidResponse(
+                statusCode: httpResponse.statusCode,
+                body: errorMessage
+            )
         }
 
-        let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-
-        // Update stored tokens
-        self.accessToken = tokenResponse.accessToken
-        if let newRefreshToken = tokenResponse.refreshToken {
-            self.refreshToken = newRefreshToken
+        // Parse response
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let newAccessToken = json["access_token"] as? String else {
+            throw SwiftXDAVError.parsingError("Failed to parse token response")
         }
 
-        // Update expiry time
-        if let expiresIn = tokenResponse.expiresIn {
-            self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresIn - 300))
+        // Update token
+        self.accessToken = newAccessToken
+
+        // Update expiration if provided
+        if let expiresIn = json["expires_in"] as? TimeInterval {
+            self.expiresAt = Date().addingTimeInterval(expiresIn)
         }
+
+        // Notify callback
+        onTokenRefresh?(newAccessToken, expiresAt)
     }
 
-    /// Manually update the access token
+    /// Update the token refresh callback
     ///
-    /// Useful when obtaining a new token from an external source
-    ///
-    /// - Parameters:
-    ///   - accessToken: New access token
-    ///   - refreshToken: New refresh token (optional)
-    ///   - expiresIn: Number of seconds until expiry
-    public func updateToken(accessToken: String, refreshToken: String? = nil, expiresIn: Int? = nil) {
-        self.accessToken = accessToken
-        if let refreshToken = refreshToken {
-            self.refreshToken = refreshToken
-        }
-        if let expiresIn = expiresIn {
-            self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresIn - 300))
-        }
+    /// - Parameter callback: Callback to invoke when tokens are refreshed
+    public func setTokenRefreshCallback(_ callback: @escaping @Sendable (String, Date?) -> Void) {
+        self.onTokenRefresh = callback
     }
 }
 
-/// HTTP client that automatically refreshes OAuth 2.0 tokens
-public actor OAuth2HTTPClient: HTTPClient {
-    private let baseClient: HTTPClient
-    private let tokenManager: OAuth2TokenManager
+// MARK: - Google-Specific Helper
 
-    /// Initialize OAuth 2.0 authenticated HTTP client
+extension OAuth2TokenManager {
+    /// Create a token manager for Google services
     ///
     /// - Parameters:
-    ///   - baseClient: Underlying HTTP client for requests
-    ///   - tokenManager: OAuth 2.0 token manager
-    public init(baseClient: HTTPClient, tokenManager: OAuth2TokenManager) {
-        self.baseClient = baseClient
-        self.tokenManager = tokenManager
-    }
-
-    public func request(
-        _ method: HTTPMethod,
-        url: URL,
-        headers: [String: String]?,
-        body: Data?
-    ) async throws -> HTTPResponse {
-        // Get valid access token (refreshes if needed)
-        let accessToken = try await tokenManager.getValidAccessToken()
-
-        // Add OAuth bearer token to headers
-        var authHeaders = headers ?? [:]
-        authHeaders["Authorization"] = "Bearer \(accessToken)"
-
-        return try await baseClient.request(
-            method,
-            url: url,
-            headers: authHeaders,
-            body: body
+    ///   - accessToken: The Google OAuth 2.0 access token
+    ///   - refreshToken: The Google OAuth 2.0 refresh token
+    ///   - clientID: Your Google OAuth 2.0 client ID
+    ///   - clientSecret: Your Google OAuth 2.0 client secret
+    ///   - expiresAt: When the access token expires
+    ///   - onTokenRefresh: Callback when tokens are refreshed
+    /// - Returns: A configured OAuth2TokenManager for Google
+    public static func google(
+        accessToken: String,
+        refreshToken: String,
+        clientID: String,
+        clientSecret: String,
+        expiresAt: Date? = nil,
+        onTokenRefresh: (@Sendable (String, Date?) -> Void)? = nil
+    ) -> OAuth2TokenManager {
+        OAuth2TokenManager(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            tokenURL: URL(string: "https://oauth2.googleapis.com/token")!,
+            clientID: clientID,
+            clientSecret: clientSecret,
+            expiresAt: expiresAt,
+            onTokenRefresh: onTokenRefresh
         )
     }
 }

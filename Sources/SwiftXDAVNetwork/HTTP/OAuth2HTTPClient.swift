@@ -123,7 +123,7 @@ extension OAuth2HTTPClient {
         clientID: String,
         clientSecret: String,
         expiresAt: Date? = nil,
-        onTokenRefresh: ((String, Date?) -> Void)? = nil
+        onTokenRefresh: (@Sendable (String, Date?) -> Void)? = nil
     ) -> OAuth2HTTPClient {
         let tokenManager = OAuth2TokenManager.google(
             accessToken: accessToken,

@@ -94,7 +94,7 @@ final class SyncCollectionTests: XCTestCase {
 
         let data = responseXML.data(using: .utf8)!
         let parser = SyncCollectionParser()
-        let response = try parser.parse(data)
+        let response = try await parser.parse(data)
 
         XCTAssertEqual(response.newSyncToken.value, "http://example.com/sync/124")
         XCTAssertEqual(response.changedResources.count, 1)
@@ -136,7 +136,7 @@ final class SyncCollectionTests: XCTestCase {
 
         let data = responseXML.data(using: .utf8)!
         let parser = SyncCollectionParser()
-        let response = try parser.parse(data)
+        let response = try await parser.parse(data)
 
         XCTAssertEqual(response.newSyncToken.value, "http://example.com/sync/initial")
         XCTAssertEqual(response.changedResources.count, 2)
@@ -157,7 +157,7 @@ final class SyncCollectionTests: XCTestCase {
         let parser = SyncCollectionParser()
 
         do {
-            _ = try parser.parse(data)
+            _ = try await parser.parse(data)
             XCTFail("Should have thrown an error")
         } catch SwiftXDAVError.parsingError(let message) {
             XCTAssertTrue(message.contains("sync-token"))
