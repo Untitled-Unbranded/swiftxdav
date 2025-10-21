@@ -52,13 +52,13 @@ Add SwiftXDAV to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/swiftxdav.git", from: "1.0.0")
+    .package(url: "https://github.com/untitled-unbranded/swiftxdav.git", from: "1.0.0")
 ]
 ```
 
 Or in Xcode:
 1. File → Add Package Dependencies...
-2. Enter: `https://github.com/yourusername/swiftxdav.git`
+2. Enter: `https://github.com/untitled-unbranded/swiftxdav.git`
 3. Select version and add to your target
 
 ## Quick Start
@@ -359,7 +359,7 @@ This modular design allows you to import only what you need.
 
 ### API Documentation
 
-- **Online**: Full API documentation hosted at [yourusername.github.io/swiftxdav/documentation/swiftxdav/](https://yourusername.github.io/swiftxdav/documentation/swiftxdav/) (once GitHub Pages is configured)
+- **Online**: Full API documentation hosted at [untitled-unbranded.github.io/swiftxdav/documentation/swiftxdav/](https://untitled-unbranded.github.io/swiftxdav/documentation/swiftxdav/) (once GitHub Pages is configured)
 - **Local**: Generate with `swift package generate-documentation --target SwiftXDAV`
 
 ### Guides
@@ -557,7 +557,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: Report bugs at https://github.com/yourusername/swiftxdav/issues
+- **Issues**: Report bugs at https://github.com/untitled-unbranded/swiftxdav/issues
 - **Documentation**: Full API docs available via DocC
 - **RFC Standards**: See `docs/research/` for protocol details
 
