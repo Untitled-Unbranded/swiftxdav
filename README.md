@@ -357,7 +357,14 @@ This modular design allows you to import only what you need.
 
 ## Documentation
 
-- **API Documentation**: Full DocC documentation available (run `swift package generate-documentation`)
+### API Documentation
+
+- **Online**: Full API documentation hosted at [yourusername.github.io/swiftxdav/documentation/swiftxdav/](https://yourusername.github.io/swiftxdav/documentation/swiftxdav/) (once GitHub Pages is configured)
+- **Local**: Generate with `swift package generate-documentation --target SwiftXDAV`
+
+### Guides
+
+- **GitHub Pages Setup**: See `docs/GITHUB_PAGES_SETUP.md` for hosting documentation
 - **Implementation Guide**: See `docs/research/IMPLEMENTATION_PLAN.md`
 - **RFC Standards**: See `docs/research/RFC_STANDARDS.md`
 - **Server Details**: See `docs/research/SERVER_IMPLEMENTATIONS.md`
