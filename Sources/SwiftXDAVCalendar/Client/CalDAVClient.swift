@@ -463,6 +463,41 @@ extension CalDAVClient {
         )
     }
 
+    /// Create a CalDAV client for Google Calendar with OAuth 2.0 token refresh
+    ///
+    /// This initializer creates a client that automatically refreshes OAuth 2.0 tokens.
+    ///
+    /// - Parameters:
+    ///   - accessToken: OAuth 2.0 access token
+    ///   - refreshToken: OAuth 2.0 refresh token
+    ///   - clientID: Google OAuth 2.0 client ID
+    ///   - clientSecret: Google OAuth 2.0 client secret
+    ///   - expiresAt: When the access token expires
+    ///   - onTokenRefresh: Callback invoked when tokens are refreshed (for persistence)
+    /// - Returns: A configured CalDAV client for Google Calendar with auto-refresh
+    public static func googleWithRefresh(
+        accessToken: String,
+        refreshToken: String,
+        clientID: String,
+        clientSecret: String,
+        expiresAt: Date? = nil,
+        onTokenRefresh: ((String, Date?) -> Void)? = nil
+    ) -> CalDAVClient {
+        let oauth2Client = OAuth2HTTPClient.google(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            clientID: clientID,
+            clientSecret: clientSecret,
+            expiresAt: expiresAt,
+            onTokenRefresh: onTokenRefresh
+        )
+
+        return CalDAVClient(
+            httpClient: oauth2Client,
+            baseURL: URL(string: "https://apidata.googleusercontent.com/caldav/v2")!
+        )
+    }
+
     /// Create a CalDAV client for a custom server
     ///
     /// - Parameters:
