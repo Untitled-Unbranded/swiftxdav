@@ -86,6 +86,12 @@ public enum SwiftXDAVError: Error, LocalizedError, Sendable {
     /// - Parameter message: Details about what data is invalid
     case invalidData(String)
 
+    /// The sync token has expired or is invalid
+    ///
+    /// This error is returned when the server no longer recognizes a sync token.
+    /// The client must perform a full sync (initial sync with no token) to recover.
+    case syncTokenExpired
+
     /// A human-readable description of the error
     public var errorDescription: String? {
         switch self {
@@ -113,6 +119,8 @@ public enum SwiftXDAVError: Error, LocalizedError, Sendable {
             return "Unsupported operation: \(message)"
         case .invalidData(let message):
             return "Invalid data: \(message)"
+        case .syncTokenExpired:
+            return "Sync token has expired"
         }
     }
 
@@ -143,6 +151,8 @@ public enum SwiftXDAVError: Error, LocalizedError, Sendable {
             return "This operation is not supported by the server"
         case .invalidData:
             return "The data provided does not meet the required format"
+        case .syncTokenExpired:
+            return "The sync token is no longer valid. A full sync is required."
         }
     }
 }
@@ -177,6 +187,8 @@ extension SwiftXDAVError: Equatable {
             return lhsMsg == rhsMsg
         case (.invalidData(let lhsMsg), .invalidData(let rhsMsg)):
             return lhsMsg == rhsMsg
+        case (.syncTokenExpired, .syncTokenExpired):
+            return true
         default:
             return false
         }
