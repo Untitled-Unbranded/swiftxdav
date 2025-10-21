@@ -446,6 +446,41 @@ extension CardDAVClient {
         )
     }
 
+    /// Create a CardDAV client for Google Contacts with OAuth 2.0 token refresh
+    ///
+    /// This initializer creates a client that automatically refreshes OAuth 2.0 tokens.
+    ///
+    /// - Parameters:
+    ///   - accessToken: OAuth 2.0 access token
+    ///   - refreshToken: OAuth 2.0 refresh token
+    ///   - clientID: Google OAuth 2.0 client ID
+    ///   - clientSecret: Google OAuth 2.0 client secret
+    ///   - expiresAt: When the access token expires
+    ///   - onTokenRefresh: Callback invoked when tokens are refreshed (for persistence)
+    /// - Returns: A configured CardDAV client for Google Contacts with auto-refresh
+    public static func googleWithRefresh(
+        accessToken: String,
+        refreshToken: String,
+        clientID: String,
+        clientSecret: String,
+        expiresAt: Date? = nil,
+        onTokenRefresh: ((String, Date?) -> Void)? = nil
+    ) -> CardDAVClient {
+        let oauth2Client = OAuth2HTTPClient.google(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            clientID: clientID,
+            clientSecret: clientSecret,
+            expiresAt: expiresAt,
+            onTokenRefresh: onTokenRefresh
+        )
+
+        return CardDAVClient(
+            httpClient: oauth2Client,
+            baseURL: URL(string: "https://www.googleapis.com/.well-known/carddav")!
+        )
+    }
+
     /// Create a CardDAV client for a custom server
     ///
     /// - Parameters:
