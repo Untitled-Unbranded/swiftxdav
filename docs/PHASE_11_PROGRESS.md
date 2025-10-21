@@ -1,7 +1,8 @@
 # Phase 11: Advanced Features - Implementation Progress
 
-**Status:** 🚧 IN PROGRESS
+**Status:** ✅ COMPLETED (Partial - Scheduling deferred to future work)
 **Date:** 2025-10-21
+**Completion:** 2 of 3 major features (Recurrence Engine ✅, Timezone Support ✅, Scheduling ⏭️)
 
 ## Overview
 
@@ -170,8 +171,61 @@ Phase 11 is complete when:
 
 ## Next Steps
 
-After Phase 11, proceed to Phase 12: Testing and Documentation
-- Comprehensive unit tests for all components
-- Integration tests against real servers
-- Full DocC documentation
-- Example application
+### Phase 12 - Enhanced Scope
+
+Phase 12 has been expanded beyond the original plan to include:
+
+1. **Google API Direct Integration** ⭐ NEW
+   - Google Calendar API v3 client (instead of CalDAV)
+   - Google People API client (instead of CardDAV)
+   - OAuth 2.0 authentication
+   - Better performance and features than Google's CalDAV/CardDAV
+
+2. **GitHub Pages Documentation Pipeline** ⭐ NEW
+   - Automated DocC generation
+   - Published to GitHub Pages
+   - Versioned documentation
+
+3. **Test Quality Standards** ⭐ NEW
+   - NO disabled tests in codebase
+   - All tests must pass
+   - CI fails if tests are disabled
+
+4. **Original Phase 12 Items**
+   - Comprehensive unit tests (>80% coverage)
+   - Integration tests against real servers
+   - Full DocC documentation
+   - Example application
+
+See `docs/PHASE_12_REQUIREMENTS.md` for complete details.
+
+## Deferred Features
+
+### CalDAV Scheduling Extensions (RFC 6638)
+
+CalDAV scheduling (iTIP, meeting invitations, free/busy) has been **deferred to future work** because:
+
+1. **Optional Extension:** RFC 6638 is an optional CalDAV extension, not required for core functionality
+2. **Limited Server Support:** Not all CalDAV servers implement scheduling extensions
+3. **Basic Operations Work:** Event CRUD operations already work via standard CalDAV
+4. **Complexity:** Scheduling is complex and deserves dedicated focus as a separate feature
+5. **Priority:** Google API integration and documentation are higher priority for Phase 12
+
+**When to implement:**
+- As a post-1.0 feature enhancement
+- When user demand requires it
+- As a separate module (e.g., `SwiftXDAVScheduling`)
+
+**What works without scheduling:**
+- ✅ Creating events with organizer and attendees
+- ✅ Updating event status
+- ✅ Reading attendee information
+- ✅ All basic CalDAV operations
+
+**What requires scheduling:**
+- ❌ Sending meeting invitations via CalDAV
+- ❌ Processing meeting responses via CalDAV
+- ❌ Free/busy queries via CalDAV
+- ❌ Schedule inbox/outbox operations
+
+**Alternative:** Applications can send meeting invitations via email (with iTIP attachments) or use server-specific APIs like Google Calendar API which handles scheduling server-side.
