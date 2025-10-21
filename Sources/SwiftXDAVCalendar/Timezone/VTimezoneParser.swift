@@ -1,4 +1,5 @@
 import Foundation
+import SwiftXDAVCore
 
 /// Parser for VTIMEZONE components in iCalendar data.
 ///
