@@ -97,16 +97,19 @@ final class OAuth2TokenManagerTests: XCTestCase {
     // MARK: - Google Helper
 
     func testGoogleHelper() async {
+        let futureDate = Date().addingTimeInterval(3600) // 1 hour from now
         let manager = OAuth2TokenManager.google(
             accessToken: "ya29.abc",
             refreshToken: "1//0g...",
             clientID: "client-id.apps.googleusercontent.com",
-            clientSecret: "secret"
+            clientSecret: "secret",
+            expiresAt: futureDate
         )
 
         let token = try? await manager.getAccessToken()
-        // Since we can't actually refresh without a real server, just verify we get a token
+        // Since token is not expired, it should return the current access token
         XCTAssertNotNil(token)
+        XCTAssertEqual(token, "ya29.abc")
     }
 
     // MARK: - Get Access Token

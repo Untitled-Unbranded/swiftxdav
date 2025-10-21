@@ -138,7 +138,7 @@ public actor ServerDetector {
             return .iCloud
         }
 
-        if host.contains("google.com") || host.contains("googleapis.com") {
+        if host.contains("google.com") || host.contains("googleapis.com") || host.contains("googleusercontent.com") {
             return .google
         }
 

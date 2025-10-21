@@ -78,11 +78,12 @@ public struct SyncCollectionRequest {
         xml.startElement("d:sync-collection", attributes: ["xmlns:d": "DAV:"])
 
         // Sync token element
+        // RFC 6578 requires explicit opening/closing tags, not self-closing
+        xml.startElement("d:sync-token")
         if let token = syncToken {
-            xml.element("d:sync-token", value: token.value)
-        } else {
-            xml.element("d:sync-token")
+            xml.raw(token.value)
         }
+        xml.endElement("d:sync-token")
 
         // Sync level (1 = immediate children only)
         xml.element("d:sync-level", value: "1")

@@ -132,12 +132,21 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
             // Don't create a property for href
             break
 
+        case "comp":
+            // Component element in supported-calendar-component-set
+            if let property = currentProperty, property.name == "supported-calendar-component-set" {
+                // Extract the name attribute
+                if let componentName = attributeDict["name"] {
+                    property.componentNames.append(componentName)
+                }
+            }
+
         default:
             // Check if we're inside a prop element but not in resourcetype sub-elements
             // Only create property if parent is "prop" (not nested in another property)
             let parentElement = elementStack.count >= 2 ? elementStack[elementStack.count - 2] : ""
             if parentElement == "prop" &&
-               !["prop", "propstat", "response", "multistatus", "collection", "calendar"].contains(localName) {
+               !["prop", "propstat", "response", "multistatus", "collection", "calendar", "comp"].contains(localName) {
                 // This is a property element
                 currentProperty = PropertyBuilder(
                     namespace: currentNamespace,
@@ -171,8 +180,14 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
             }
 
         case "status":
-            // Status in propstat
-            currentPropstat?.status = trimmedValue
+            // Status can be in propstat or directly under response
+            if elementStack.count >= 2 && elementStack[elementStack.count - 2] == "response" {
+                // Status directly under response (e.g., for deleted resources)
+                currentResponse?.statusInResponse = trimmedValue
+            } else {
+                // Status in propstat
+                currentPropstat?.status = trimmedValue
+            }
 
         case "propstat":
             // Finished building propstat
@@ -273,6 +288,7 @@ public struct PropfindResponse: Sendable, Equatable {
 private class ResponseBuilder {
     var href: String = ""
     var propstats: [PropstatBuilder] = []
+    var statusInResponse: String?
 
     func build() -> PropfindResponse? {
         guard !href.isEmpty else { return nil }
@@ -289,6 +305,11 @@ private class ResponseBuilder {
                     status = propstatStatus
                 }
             }
+        }
+
+        // Use statusInResponse if no propstat status was found
+        if status == nil {
+            status = statusInResponse
         }
 
         return PropfindResponse(
@@ -311,6 +332,7 @@ private class PropertyBuilder {
     var nestedHref: String?
     var isCollection = false
     var isCalendar = false
+    var componentNames: [String] = []  // For supported-calendar-component-set
 
     init(namespace: String, name: String) {
         self.namespace = namespace
@@ -334,6 +356,11 @@ private class PropertyBuilder {
             } else if isCalendar {
                 finalValue = "calendar"
             }
+        }
+
+        // Special handling for supported-calendar-component-set
+        if name == "supported-calendar-component-set" && !componentNames.isEmpty {
+            finalValue = componentNames.joined(separator: ",")
         }
 
         return DAVProperty(
