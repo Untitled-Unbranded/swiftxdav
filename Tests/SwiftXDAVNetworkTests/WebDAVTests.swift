@@ -8,7 +8,7 @@ final class WebDAVTests: XCTestCase {
 
     // MARK: - XML Parser Tests (Simplified - core functionality verified)
 
-    func _disabled_testParseSimpleResponse() throws {
+    func testParseSimpleResponse() throws {
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <d:multistatus xmlns:d="DAV:">
@@ -96,6 +96,37 @@ final class WebDAVTests: XCTestCase {
 
     // NOTE: Skipping detailed multiple properties test - simpler tests cover the basics
     // The parser correctly handles the common CalDAV/CardDAV response patterns
+
+    func testParseNestedHrefProperty() throws {
+        // Test for properties like current-user-principal that have nested <href> elements
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>/</d:href>
+            <d:propstat>
+              <d:prop>
+                <d:current-user-principal>
+                  <d:href>/principals/user1/</d:href>
+                </d:current-user-principal>
+              </d:prop>
+              <d:status>HTTP/1.1 200 OK</d:status>
+            </d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        let data = xml.data(using: .utf8)!
+        let parser = WebDAVXMLParser()
+        let responses = try parser.parse(data)
+
+        XCTAssertEqual(responses.count, 1, "Should have one response")
+        XCTAssertEqual(responses[0].href, "/", "Response href should be /")
+
+        let principal = responses[0].property(named: "current-user-principal")
+        XCTAssertNotNil(principal, "current-user-principal property should exist")
+        XCTAssertEqual(principal, "/principals/user1/", "current-user-principal should contain the nested href value")
+    }
 
     func testParseEmptyMultistatus() throws {
         let xml = """

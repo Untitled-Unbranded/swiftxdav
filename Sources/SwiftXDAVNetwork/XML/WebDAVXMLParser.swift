@@ -58,6 +58,18 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
     // Element stack for tracking hierarchy
     private var elementStack: [String] = []
 
+    // MARK: - Helper Methods
+
+    /// Strip namespace prefix from element name (e.g., "d:href" → "href")
+    private func stripNamespace(_ elementName: String) -> String {
+        if let colonIndex = elementName.firstIndex(of: ":") {
+            return String(elementName[elementName.index(after: colonIndex)...])
+        }
+        return elementName
+    }
+
+    // MARK: - Parsing
+
     /// Parse WebDAV XML response data
     ///
     /// - Parameter data: The XML data from the HTTP response
@@ -97,13 +109,15 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
         qualifiedName qName: String?,
         attributes attributeDict: [String: String] = [:]
     ) {
-        currentElement = elementName
+        let localName = stripNamespace(elementName)
+
+        currentElement = localName
         currentNamespace = namespaceURI ?? ""
         currentValue = ""
-        elementStack.append(elementName)
+        elementStack.append(localName)
 
         // Start building structures based on element
-        switch elementName {
+        switch localName {
         case "response":
             currentResponse = ResponseBuilder()
 
@@ -114,14 +128,20 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
             // Inside prop element, don't create a property for it
             break
 
+        case "href":
+            // Don't create a property for href
+            break
+
         default:
             // Check if we're inside a prop element but not in resourcetype sub-elements
-            if elementStack.contains("prop") &&
-               !["prop", "propstat", "response", "multistatus", "collection", "calendar"].contains(elementName) {
+            // Only create property if parent is "prop" (not nested in another property)
+            let parentElement = elementStack.count >= 2 ? elementStack[elementStack.count - 2] : ""
+            if parentElement == "prop" &&
+               !["prop", "propstat", "response", "multistatus", "collection", "calendar"].contains(localName) {
                 // This is a property element
                 currentProperty = PropertyBuilder(
                     namespace: currentNamespace,
-                    name: elementName
+                    name: localName
                 )
             }
         }
@@ -137,13 +157,17 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
+        let localName = stripNamespace(elementName)
         let trimmedValue = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        switch elementName {
+        switch localName {
         case "href":
             // Check if this href is directly under response (not under prop)
             if elementStack.count >= 2 && elementStack[elementStack.count - 2] == "response" {
                 currentResponse?.href = trimmedValue.xmlUnescaped
+            } else if currentProperty != nil {
+                // This is a nested href within a property value (e.g., current-user-principal)
+                currentProperty?.nestedHref = trimmedValue.xmlUnescaped
             }
 
         case "status":
@@ -185,7 +209,7 @@ public final class WebDAVXMLParser: NSObject, XMLParserDelegate {
 
         default:
             // Check if this is a property element
-            if let property = currentProperty, property.name == elementName {
+            if let property = currentProperty, property.name == localName {
                 // Set the property value
                 property.value = trimmedValue.isEmpty ? nil : trimmedValue.xmlUnescaped
                 currentPropstat?.properties.append(property.build())
@@ -284,6 +308,7 @@ private class PropertyBuilder {
     let namespace: String
     let name: String
     var value: String?
+    var nestedHref: String?
     var isCollection = false
     var isCalendar = false
 
@@ -294,6 +319,11 @@ private class PropertyBuilder {
 
     func build() -> DAVProperty {
         var finalValue = value
+
+        // If there's a nested href, use it as the value (properties like current-user-principal)
+        if let href = nestedHref {
+            finalValue = href
+        }
 
         // Special handling for resourcetype
         if name == "resourcetype" {
