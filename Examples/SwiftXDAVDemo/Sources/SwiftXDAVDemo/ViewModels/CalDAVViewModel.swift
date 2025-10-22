@@ -57,9 +57,21 @@ final class CalDAVViewModel {
     }
 
     func loadTodos(from calendar: SwiftXDAVCalendar.Calendar) async {
-        // TODO: Implement fetchTodos in CalDAVClient
-        // For now, just show a message
-        appState.todos = []
-        appState.errorMessage = "Todo fetching not yet implemented in framework"
+        guard let client = appState.calDAVClient else { return }
+
+        appState.isLoading = true
+        appState.clearError()
+
+        do {
+            let todos = try await client.fetchTodos(from: calendar)
+            appState.todos = todos
+            appState.selectedCalendar = calendar
+        } catch let error as SwiftXDAVError {
+            appState.errorMessage = "Failed to load todos: \(error)"
+        } catch {
+            appState.errorMessage = "Unexpected error: \(error.localizedDescription)"
+        }
+
+        appState.isLoading = false
     }
 }

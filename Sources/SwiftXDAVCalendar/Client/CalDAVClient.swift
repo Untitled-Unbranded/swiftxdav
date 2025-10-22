@@ -363,6 +363,67 @@ public actor CalDAVClient {
         try await webdav.delete(at: eventURL)
     }
 
+    // MARK: - Todo Operations
+
+    /// Fetch todos (tasks) from a calendar
+    ///
+    /// Retrieves all todo items (VTODO components) from the specified calendar.
+    ///
+    /// ## Example
+    ///
+    /// ```swift
+    /// let todos = try await client.fetchTodos(from: calendar)
+    /// for todo in todos {
+    ///     print("\(todo.summary ?? "Untitled"): \(todo.status?.rawValue ?? "No status")")
+    /// }
+    /// ```
+    ///
+    /// - Parameter calendar: The calendar to fetch todos from
+    /// - Returns: An array of `VTodo` objects
+    /// - Throws: `SwiftXDAVError` if the operation fails
+    public func fetchTodos(from calendar: Calendar) async throws -> [VTodo] {
+        let queryXML = buildTodoQuery()
+
+        let response = try await httpClient.request(
+            .report,
+            url: calendar.url,
+            headers: [
+                "Content-Type": "application/xml; charset=utf-8",
+                "Depth": "1"
+            ],
+            body: queryXML
+        )
+
+        guard response.statusCode == 207 else {
+            throw SwiftXDAVError.invalidResponse(
+                statusCode: response.statusCode,
+                body: String(data: response.data, encoding: .utf8)
+            )
+        }
+
+        // Parse multi-status response
+        let parser = WebDAVXMLParser()
+        let responses = try parser.parse(response.data)
+
+        var todos: [VTodo] = []
+        let icalParser = ICalendarParser()
+
+        for resp in responses {
+            if let calendarData = resp.property(named: "calendar-data"),
+               let data = calendarData.data(using: .utf8) {
+                do {
+                    let ical = try await icalParser.parse(data)
+                    todos.append(contentsOf: ical.todos)
+                } catch {
+                    // Skip malformed todos but continue processing others
+                    continue
+                }
+            }
+        }
+
+        return todos
+    }
+
     // MARK: - Helper Methods
 
     /// Clean up href values that may contain XML fragments
@@ -413,6 +474,26 @@ public actor CalDAVClient {
               <C:comp-filter name="VEVENT">
                 <C:time-range start="\(start.toICalendarFormat())" end="\(end.toICalendarFormat())"/>
               </C:comp-filter>
+            </C:comp-filter>
+          </C:filter>
+        </C:calendar-query>
+        """
+
+        return xml.data(using: .utf8) ?? Data()
+    }
+
+    /// Build a todo-query REPORT request body
+    private func buildTodoQuery() -> Data {
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+          <D:prop>
+            <D:getetag/>
+            <C:calendar-data/>
+          </D:prop>
+          <C:filter>
+            <C:comp-filter name="VCALENDAR">
+              <C:comp-filter name="VTODO"/>
             </C:comp-filter>
           </C:filter>
         </C:calendar-query>
