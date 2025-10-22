@@ -28,15 +28,88 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Build Documentation
+      - name: Build Documentation for All Modules
         run: |
-          # Build documentation for the SwiftXDAV target (umbrella module)
-          swift package --allow-writing-to-directory ./.docc-build \
+          mkdir -p .docc-build
+
+          # Build documentation for each module separately
+          echo "Building SwiftXDAV documentation..."
+          swift package --allow-writing-to-directory ./.docc-build/SwiftXDAV \
             generate-documentation \
             --target SwiftXDAV \
-            --output-path ./.docc-build \
+            --output-path ./.docc-build/SwiftXDAV \
             --transform-for-static-hosting \
             --hosting-base-path swiftxdav
+
+          echo "Building SwiftXDAVCalendar documentation..."
+          swift package --allow-writing-to-directory ./.docc-build/SwiftXDAVCalendar \
+            generate-documentation \
+            --target SwiftXDAVCalendar \
+            --output-path ./.docc-build/SwiftXDAVCalendar \
+            --transform-for-static-hosting \
+            --hosting-base-path swiftxdav/SwiftXDAVCalendar
+
+          echo "Building SwiftXDAVContacts documentation..."
+          swift package --allow-writing-to-directory ./.docc-build/SwiftXDAVContacts \
+            generate-documentation \
+            --target SwiftXDAVContacts \
+            --output-path ./.docc-build/SwiftXDAVContacts \
+            --transform-for-static-hosting \
+            --hosting-base-path swiftxdav/SwiftXDAVContacts
+
+          echo "Building SwiftXDAVNetwork documentation..."
+          swift package --allow-writing-to-directory ./.docc-build/SwiftXDAVNetwork \
+            generate-documentation \
+            --target SwiftXDAVNetwork \
+            --output-path ./.docc-build/SwiftXDAVNetwork \
+            --transform-for-static-hosting \
+            --hosting-base-path swiftxdav/SwiftXDAVNetwork
+
+          echo "Building SwiftXDAVCore documentation..."
+          swift package --allow-writing-to-directory ./.docc-build/SwiftXDAVCore \
+            generate-documentation \
+            --target SwiftXDAVCore \
+            --output-path ./.docc-build/SwiftXDAVCore \
+            --transform-for-static-hosting \
+            --hosting-base-path swiftxdav/SwiftXDAVCore
+
+          # Create an index.html that redirects to the main SwiftXDAV documentation
+          cat > .docc-build/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>SwiftXDAV Documentation</title>
+              <meta http-equiv="refresh" content="0; url=SwiftXDAV/documentation/swiftxdav/">
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                      max-width: 800px;
+                      margin: 100px auto;
+                      padding: 20px;
+                      text-align: center;
+                  }
+                  h1 { color: #333; }
+                  ul { list-style: none; padding: 0; }
+                  li { margin: 10px 0; }
+                  a { color: #007AFF; text-decoration: none; font-size: 18px; }
+                  a:hover { text-decoration: underline; }
+              </style>
+          </head>
+          <body>
+              <h1>SwiftXDAV Documentation</h1>
+              <p>Redirecting to the main documentation...</p>
+              <p>Or choose a specific module:</p>
+              <ul>
+                  <li><a href="SwiftXDAV/documentation/swiftxdav/">SwiftXDAV (Main)</a></li>
+                  <li><a href="SwiftXDAVCalendar/documentation/swiftxdavcalendar/">SwiftXDAVCalendar</a></li>
+                  <li><a href="SwiftXDAVContacts/documentation/swiftxdavcontacts/">SwiftXDAVContacts</a></li>
+                  <li><a href="SwiftXDAVNetwork/documentation/swiftxdavnetwork/">SwiftXDAVNetwork</a></li>
+                  <li><a href="SwiftXDAVCore/documentation/swiftxdavcore/">SwiftXDAVCore</a></li>
+              </ul>
+          </body>
+          </html>
+          EOF
 
       - name: Fix permissions
         run: |

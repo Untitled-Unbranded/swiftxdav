@@ -107,52 +107,31 @@ for contact in contacts {
 - <doc:CalDAVGuide>
 - <doc:CardDAVGuide>
 
-### CalDAV
+### Framework Architecture
 
-- ``CalDAVClient``
-- ``Calendar``
-- ``VEvent``
-- ``VTodo``
-- ``RecurrenceRule``
-- ``ICalendar``
-- ``ICalendarParser``
-- ``ICalendarSerializer``
+SwiftXDAV is composed of several focused modules:
 
-### CardDAV
+#### SwiftXDAVCalendar
+CalDAV client, iCalendar (RFC 5545) parser, calendar and event models, recurrence handling, and timezone support.
 
-- ``CardDAVClient``
-- ``AddressBook``
-- ``VCard``
-- ``VCardParser``
-- ``VCardSerializer``
+Key types: `CalDAVClient`, `Calendar`, `VEvent`, `VTodo`, `ICalendar`, `RecurrenceRule`, `RecurrenceEngine`, `TimezoneHandler`
 
-### WebDAV & Networking
+#### SwiftXDAVContacts
+CardDAV client, vCard (RFC 6350) parser, and contact models.
 
-- ``WebDAVOperations``
-- ``HTTPClient``
-- ``AuthenticatedHTTPClient``
-- ``OAuth2HTTPClient``
-- ``ServerDetector``
-- ``ServerCapabilities``
+Key types: `CardDAVClient`, `AddressBook`, `VCard`, `VCardParser`, `VCardSerializer`
 
-### Synchronization
+#### SwiftXDAVNetwork
+WebDAV (RFC 4918) operations, HTTP clients, authentication (Basic, OAuth2), and server detection.
 
-- ``SyncToken``
-- ``SyncChange``
-- ``SyncResult``
-- ``ConflictResolution``
+Key types: `WebDAVOperations`, `HTTPClient`, `AuthenticatedHTTPClient`, `OAuth2HTTPClient`, `OAuth2TokenManager`, `ServerDetector`
 
-### Core Types
+#### SwiftXDAVCore
+Core protocols, error types, sync models, and shared utilities.
 
-- ``SwiftXDAVError``
-- ``DAVProperty``
-- ``Resource``
+Key types: `SwiftXDAVError`, `DAVProperty`, `Resource`, `SyncToken`, `SyncChange`, `SyncResult`
 
-### Advanced Features
-
-- ``RecurrenceEngine``
-- ``TimezoneHandler``
-- ``VTimezoneParser``
+> Note: All types are automatically re-exported when you `import SwiftXDAV`. You can also import individual modules if you only need specific functionality.
 
 ## See Also
 
