@@ -2,29 +2,22 @@
 ///
 /// This is the umbrella module that re-exports all public APIs from the framework modules.
 ///
-/// ## Overview
-///
 /// SwiftXDAV provides a complete implementation of CalDAV (RFC 4791), CardDAV (RFC 6352),
 /// and WebDAV (RFC 4918) protocols for Apple platforms. It includes parsers for iCalendar
 /// (RFC 5545) and vCard (RFC 6350) formats.
 ///
-/// ## Topics
+/// Import this module to access all SwiftXDAV functionality:
 ///
-/// ### Getting Started
-/// - ``CalDAVClient``
-/// - ``CardDAVClient``
+/// ```swift
+/// import SwiftXDAV
 ///
-/// ### Core Types
-/// - ``SwiftXDAVCore``
+/// let client = CalDAVClient.iCloud(
+///     username: "user@icloud.com",
+///     appSpecificPassword: "abcd-efgh-ijkl-mnop"
+/// )
 ///
-/// ### Network Layer
-/// - ``SwiftXDAVNetwork``
-///
-/// ### Calendar Support
-/// - ``SwiftXDAVCalendar``
-///
-/// ### Contacts Support
-/// - ``SwiftXDAVContacts``
+/// let calendars = try await client.listCalendars()
+/// ```
 
 @_exported import SwiftXDAVCore
 @_exported import SwiftXDAVNetwork
